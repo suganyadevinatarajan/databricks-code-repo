@@ -190,3 +190,14 @@ for i in range(13):
 # COMMAND ----------
 
 dbutils.widgets.removeAll()
+
+# COMMAND ----------
+
+# Source path in the first Git folder
+source_path = "//Workspace/Users/suganyadevi2803@gmail.com/Irfan's databricks-code-repo/databricks_workouts_2025/2_Spark_DataFrame_Read_Write_Operations/1-Basic-Readops"
+
+# Destination path in the second Git folder
+destination_path = "/Workspace/Users/suganyadevi2803@gmail.com/databricks-code-repo/databricks_workouts_2025/2_Spark_DataFrame_Read_Write_Operations"
+
+# Copy the file (use recurse=True for folders)
+dbutils.fs.cp(source_path, destination_path, recurse=False)
