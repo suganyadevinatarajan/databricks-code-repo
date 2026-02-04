@@ -21,10 +21,11 @@
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC drop table lakehousecat.deltadb.customer_txn;
-# MAGIC drop table lakehousecat.deltadb.customer_txn_part;
+# MAGIC
 # MAGIC drop table lakehousecat.deltadb.drugstbl;
 # MAGIC drop table lakehousecat.deltadb.drugstbl_merge;
+# MAGIC drop table lakehousecat.deltadb.customer_txn;
+# MAGIC drop table lakehousecat.deltadb.customer_txn_part;
 # MAGIC drop table lakehousecat.deltadb.drugstbl_partitioned;
 # MAGIC drop table lakehousecat.deltadb.employee_dv_demo1;
 # MAGIC drop table lakehousecat.deltadb.product_inventory;
@@ -47,17 +48,23 @@ spark.sql(f"""CREATE VOLUME IF NOT EXISTS lakehousecat.deltadb.datalake;""")
 # COMMAND ----------
 
 df = spark.read.csv('/Volumes/lakehousecat/deltadb/datalake/druginfo.csv',header=True,inferSchema=True)#Reading normal data from datalake
-df.write.format("delta").mode("overwrite").save("/Volumes/lakehousecat/deltadb/datalake/targetdir")#writing normal data from deltalake(datalake)
-df.write.format("parquet").mode("overwrite").save("/Volumes/lakehousecat/deltadb/datalake/targetdirparquet")#writing normal data from parquet(datalake)
+df.write.format("delta").mode("overwrite").save("/Volumes/lakehousecat/deltadb/datalake/targetdir")#writing normal data into deltalake(deltalake)
+df.write.format("parquet").mode("overwrite").save("/Volumes/lakehousecat/deltadb/datalake/targetdirparquet")#writing normal data into parquet(datalake)
 spark.sql("drop table if exists lakehousecat.deltadb.drugstbl")
-df.write.option("mergeSchema","True").saveAsTable("lakehousecat.deltadb.drugstbl",mode='overwrite')#writing normal data from deltalakehouse(lakehouse)
+df.write.saveAsTable("lakehousecat.deltadb.drugstbl",mode='overwrite')#writing normal data from deltalakehouse(lakehouse)
 #behind it stores the data in deltafile format in the s3 bucket (location is hidden for us in databricks free edition)
+
+# COMMAND ----------
+
+#We can add Schema evolution feature just by adding the below option in Delta tables.
+#df.write.option("mergeSchema","True").saveAsTable("lakehousecat.deltadb.drugstbl",mode='overwrite')
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ####2. DML Operations in Delta Tables & Files
-# MAGIC Support for DELETE/UPDATE/MERGE
+# MAGIC - We are overcoming the WORM limitation in Cloud S3/GCS/ADLS or in Distributed storage layers like HDFS
+# MAGIC - Delta file/table supports WMRM operations, using DMLs such as  INSERT/DELETE/UPDATE/MERGE
 
 # COMMAND ----------
 
@@ -158,6 +165,7 @@ deltaTable.delete("uniqueid=206473")
 
 # COMMAND ----------
 
+#Latest version data will be queried by default
 df=spark.read.format("delta").load('/Volumes/lakehousecat/deltadb/datalake/targetdir')
 df.where('uniqueid=206473').show()
 
@@ -188,8 +196,8 @@ df.where('uniqueid=206473').show()
 # MAGIC --Delta table support merge operation for (insert/update/delete)
 # MAGIC --2899 updated
 # MAGIC --2801 inserted
-# MAGIC MERGE INTO drugstbl_merge tgt
-# MAGIC USING drugstbl src
+# MAGIC MERGE INTO drugstbl_merge tgt--2899
+# MAGIC USING drugstbl src--5700
 # MAGIC ON tgt.uniqueid = src.uniqueid
 # MAGIC WHEN MATCHED THEN
 # MAGIC   UPDATE SET tgt.usefulcount= src.usefulcount,
@@ -197,6 +205,12 @@ df.where('uniqueid=206473').show()
 # MAGIC              tgt.condition = src.condition
 # MAGIC WHEN NOT MATCHED
 # MAGIC   THEN INSERT (uniqueid,rating,date,usefulcount, drugname, condition ) VALUES (uniqueid,rating,date,usefulcount, drugname, condition);
+# MAGIC   --5700-2899 = 2801
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC select count(*) from drugstbl_merge;
 
 # COMMAND ----------
 
@@ -221,6 +235,11 @@ df.where('uniqueid=206473').show()
 # MAGIC   THEN INSERT (uniqueid,rating,date,usefulcount, drugname, condition ) VALUES (uniqueid,rating,date,usefulcount, drugname, condition)
 # MAGIC WHEN NOT MATCHED BY SOURCE 
 # MAGIC THEN DELETE;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC select count(*) from drugstbl_merge;
 
 # COMMAND ----------
 
@@ -262,7 +281,7 @@ print(spark.read.table("drugstbl_merge").count())
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ####3. Operations on Deltalake & Deltatables
+# MAGIC ####3. Additional Operations on Deltalake & Deltatables
 
 # COMMAND ----------
 
@@ -284,7 +303,8 @@ print(spark.read.table("drugstbl_merge").count())
 
 # MAGIC %sql
 # MAGIC --select * from (select * from deltadb.drugs version as of 2) where uniqueid=163740;
-# MAGIC SELECT count(1) FROM drugstbl_merge VERSION AS OF 3;
+# MAGIC SELECT count(*) FROM drugstbl_merge VERSION AS OF 5;
+# MAGIC SELECT * FROM drugstbl_merge VERSION AS OF 5 limit 10;
 
 # COMMAND ----------
 
@@ -295,7 +315,7 @@ print(spark.read.table("drugstbl_merge").count())
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT count(1) FROM drugstbl_merge TIMESTAMP AS OF '2026-01-25T18:25:04.000+00:00';
+# MAGIC SELECT count(1) FROM drugstbl_merge TIMESTAMP AS OF '2026-01-29T14:17:37.000+00:00';
 
 # COMMAND ----------
 
@@ -306,8 +326,8 @@ print(spark.read.table("drugstbl_merge").count())
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC use lakehousecat.deltadb;
-# MAGIC DESC HISTORY drugstbl_merge;
+# MAGIC --use lakehousecat.deltadb;
+# MAGIC DESC HISTORY prodcatalog.logistics.silver_staff;
 
 # COMMAND ----------
 
@@ -316,19 +336,34 @@ print(spark.read.table("drugstbl_merge").count())
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC --SET spark.databricks.delta.retentionDurationCheck.enabled = false;
-# MAGIC --alter table drugstbl_merge SET TBLPROPERTIES ('delta.deletedFileRetentionDuration' = '24 hours');
+# MAGIC %md
+# MAGIC AI Suggested feature<br>
+# MAGIC Setting the Delta table property 'delta.deletedFileRetentionDuration' to less than the default (1 week) is generally not recommended for production environments. Lowering the retention duration can lead to data loss if you need to time travel or restore data, as older files may be deleted sooner than expected. The default of 168 hours (1 week) is chosen to balance storage costs and safety for production workloads. Only reduce this value if you fully understand the risks and have a strong operational reason to do so
 
 # COMMAND ----------
 
 # MAGIC %sql
+# MAGIC --These properties can't be set in serverless, we will see this in cluster or i will get a table with more than 1 week data
+# MAGIC --SET spark.databricks.delta.retentionDurationCheck.enabled = false;
+# MAGIC --alter table drugstbl_merge SET TBLPROPERTIES ('delta.deletedFileRetentionDuration' = '24 hours');
+# MAGIC
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC --use lakehousecat.deltadb;
+# MAGIC DESC HISTORY drugstbl_merge;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC --default 168 hours (1 week), less than 1 week will not work in serverless for performance and session state reason
 # MAGIC VACUUM drugstbl_merge RETAIN 168 HOURS;
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT count(1) FROM drugstbl_merge TIMESTAMP AS OF '2026-01-26T16:55:40.000+00:00';
+# MAGIC SELECT count(1) FROM drugstbl_merge TIMESTAMP AS OF '2026-01-29T14:36:55.000+00:00';
 
 # COMMAND ----------
 
@@ -346,7 +381,7 @@ spark.sql("VACUUM drugstbl_merge RETAIN 168 HOURS")
 # MAGIC **Delta Lake uses ACID transactions under the hood via a transaction log.**
 # MAGIC | ACID        | In Databricks         |
 # MAGIC | ----------- | --------------------- |
-# MAGIC | Atomicity   | Individual Transactions |
+# MAGIC | Atomicity   | All or nothing or Individual Transactions |
 # MAGIC | Consistency | Schema + constraints  |
 # MAGIC | Isolation   | Snapshot isolation    |
 # MAGIC | Durability  | Transaction log       |
@@ -354,11 +389,21 @@ spark.sql("VACUUM drugstbl_merge RETAIN 168 HOURS")
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC CREATE TABLE acid_demo_txn (
+# MAGIC CREATE OR REPLACE TABLE acid_demo_txn (
 # MAGIC   id INT,
 # MAGIC   amount INT
 # MAGIC ) USING DELTA;
 # MAGIC
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC select * from acid_demo_txn;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC --All or nothing (Atomic/Individual Transaction)
 # MAGIC INSERT INTO acid_demo_txn VALUES
 # MAGIC (1, 100),
 # MAGIC (2, 200),
@@ -367,18 +412,41 @@ spark.sql("VACUUM drugstbl_merge RETAIN 168 HOURS")
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC --Atomicity ()
-# MAGIC UPDATE acid_demo_txn SET amount = amount + 100 WHERE id = 1;
-# MAGIC UPDATE acid_demo_txn SET amount = amount + 200 WHERE id = 1;
+# MAGIC select * from acid_demo_txn;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC select * from acid_demo_txn where id=1;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC --Atomicity (Individual transaction that doesn't affect the other)
+# MAGIC UPDATE acid_demo_txn SET amount = amount + 100 WHERE id = 1;--individual/atomic
+# MAGIC UPDATE acid_demo_txn SET amount = amount + 200 WHERE id = 1;--individual/atomic
 # MAGIC describe history acid_demo_txn;
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC --Apply constraint for consistancy
+# MAGIC select * from acid_demo_txn where id=1;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC --Apply constraint for maintaining consistancy
+# MAGIC --We can apply in databricks deltatable, 2 types of constraints (check and not null), 
+# MAGIC -- in other DBs we can use primary key, foreign key and unique constraints also..
 # MAGIC ALTER TABLE acid_demo_txn
 # MAGIC ADD CONSTRAINT positive_amount CHECK (amount > 0);
-# MAGIC INSERT INTO acid_demo_txn VALUES (4, -500);
+# MAGIC INSERT INTO acid_demo_txn VALUES (4, 100);--Atomicity and consistancy
+# MAGIC INSERT INTO acid_demo_txn VALUES (5, -100);--Atomicity and consistancy
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC select * from acid_demo_txn;
 
 # COMMAND ----------
 
