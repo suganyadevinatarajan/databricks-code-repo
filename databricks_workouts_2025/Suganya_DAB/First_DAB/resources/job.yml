@@ -1,0 +1,17 @@
+resources:
+  jobs:
+    dab_job1:
+      name: dab_job1
+      tasks:
+        - task_key: src_nootbook_dab1
+          notebook_task:
+            notebook_path: src/src_notebook.ipynb
+            source: WORKSPACE
+      queue:
+        enabled: true
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+      performance_target: PERFORMANCE_OPTIMIZED

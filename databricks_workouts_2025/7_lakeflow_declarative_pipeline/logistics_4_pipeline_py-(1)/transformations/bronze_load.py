@@ -1,39 +1,39 @@
 from pyspark import pipelines as dp
 
-
-@dp.table(name="bronze_staff_data1")
+tgt_path=spark.conf.get("tgt_path")
+@dp.table(name=f"{tgt_path}.bronze_staff_data1")
 def bronze_staff_data():
-
+    base_path=spark.conf.get("base_path")
     return (spark.readStream
             .format("cloudFiles")
             .option("cloudFiles.format", "csv")
             .option("inferColumnTypes", "true")
             .option("cloudFiles.schemaEvolutionMode","addNewColumns")
-            .load("/Volumes/catalog2_we47/schema2_we47/datalake/staff"))
+            .load(f"{base_path}/staff"))
 
-
-@dp.table(name="bronze_geotag_data1")
+tgt_path=spark.conf.get("tgt_path")
+@dp.table(name=f"{tgt_path}.bronze_geotag_data1")
 def bronze_geotag_data():
-
+    base_path=spark.conf.get("base_path")
     return (
         spark.readStream
             .format("cloudFiles")
             .option("cloudFiles.format", "csv")
             .option("inferColumnTypes", "true")
-            .load("/Volumes/catalog2_we47/schema2_we47/datalake/geotag")
+            .load(f"{base_path}/geotag")
     )
 
-
-@dp.table(name="bronze_shipments_data1")
+tgt_path=spark.conf.get("tgt_path")
+@dp.table(name=f"{tgt_path}.bronze_shipments_data1")
 def bronze_shipments_data():
-
+    base_path=spark.conf.get("base_path")
     return (
         spark.readStream
             .format("cloudFiles")
             .option("cloudFiles.format", "json")
             .option("inferColumnTypes", "true")
             .option("multiLine", "true")
-            .load("/Volumes/catalog2_we47/schema2_we47/datalake/shipment/")
+            .load(f"{base_path}/shipment/")
             .select(
                 "shipment_id",
                 "order_id",

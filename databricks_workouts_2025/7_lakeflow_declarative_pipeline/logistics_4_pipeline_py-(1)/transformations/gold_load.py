@@ -1,8 +1,9 @@
 from pyspark import pipelines as dp
 from pyspark.sql.functions import *
 
+tgt_path=spark.conf.get("tgt_path")
 @dp.materialized_view(
-    name="gold_staff_geo_enriched_dlt2",
+    name=f"{tgt_path}.gold_staff_geo_enriched_dlt2",
     comment="Staff enriched with Geo Location data",
     table_properties={"quality": "gold"}
 )
@@ -24,8 +25,9 @@ def gold_staff_geo_enriched_dlt2():
         )
     )
 
+tgt_path=spark.conf.get("tgt_path")
 @dp.materialized_view(
-    name="gold_shipment_stats1",
+    name=f"{tgt_path}.gold_shipment_stats1",
     comment="Aggregated Shipment statistics by Source City",
     table_properties={"quality": "gold"}
 )
