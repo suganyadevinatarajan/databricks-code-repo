@@ -16,9 +16,9 @@ def word_to_num_logic(value):
         
 convert_age_udf = udf(word_to_num_logic)
 
-tgt_path=spark.conf.get("tgt_path")
+
 @dp.materialized_view(
-    name=f"{tgt_path}.silver_staff_dlt2",
+    name="catalog1_we4.schema1_we4.silver_staff_dlt2",
     comment="Standardized staff data"
 )
 def silver_staff_dlt1():
@@ -35,9 +35,9 @@ def silver_staff_dlt1():
         )
     )
 
-tgt_path=spark.conf.get("tgt_path")
+
 @dp.materialized_view(
-    name=f"{tgt_path}.silver_geotag_dlt2",
+    name="catalog1_we4.schema1_we4.silver_geotag_dlt2",
     comment="Cleaned geotag data",
     table_properties={"quality": "silver"}
 )
@@ -53,9 +53,9 @@ def silver_geotag_dlt2():
         .distinct()
     )
 
-tgt_path=spark.conf.get("tgt_path")
+
 @dp.materialized_view(
-    name=f"{tgt_path}.silver_shipments_dlt2",
+    name="catalog1_we4.schema1_we4.silver_shipments_dlt2",
     comment="Enriched and split shipments data",
     table_properties={"quality": "silver"}
 )

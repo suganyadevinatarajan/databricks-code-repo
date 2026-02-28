@@ -1,7 +1,7 @@
 from pyspark import pipelines as dp
 
-tgt_path=spark.conf.get("tgt_path")
-@dp.table(name=f"{tgt_path}.bronze_staff_data1")
+
+@dp.table(name="catalog1_we4.schema1_we4.bronze_staff_data1")
 def bronze_staff_data():
     base_path=spark.conf.get("base_path")
     return (spark.readStream
@@ -11,8 +11,8 @@ def bronze_staff_data():
             .option("cloudFiles.schemaEvolutionMode","addNewColumns")
             .load(f"{base_path}/staff"))
 
-tgt_path=spark.conf.get("tgt_path")
-@dp.table(name=f"{tgt_path}.bronze_geotag_data1")
+
+@dp.table(name="catalog1_we4.schema1_we4.bronze_geotag_data1")
 def bronze_geotag_data():
     base_path=spark.conf.get("base_path")
     return (
@@ -23,8 +23,8 @@ def bronze_geotag_data():
             .load(f"{base_path}/geotag")
     )
 
-tgt_path=spark.conf.get("tgt_path")
-@dp.table(name=f"{tgt_path}.bronze_shipments_data1")
+
+@dp.table(name="catalog1_we4.schema1_we4.bronze_shipments_data1")
 def bronze_shipments_data():
     base_path=spark.conf.get("base_path")
     return (
